@@ -1,0 +1,8 @@
+**/node_modules/
+downloaded_videos/
+*.json
+*.mp4
+*.m4a
+path/
+build/
+*.spec
