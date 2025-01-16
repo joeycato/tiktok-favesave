@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 # Function to load JSON file
 def load_json(json_file):
-    with open(json_file, 'r') as file:
+    with open(json_file, 'r', encoding='utf-8') as file:
         return json_load(file)
 
 
