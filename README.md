@@ -20,7 +20,7 @@ FaveSave is a free-to-use desktop app that automatically downloads your favorite
 
 ![Screenshot of downloading data](./screenshots/download_data.png)
 
-5. Download the FaveSave zip from the [releases](https://github.com/joeycato/tiktok-favesave/releases) page and extract it to a local folder. After launching it, select the location of your JSON file ( e.g. _user_data_tiktok.json_ ) , choose your output folder and preferences, then click **Start Download** to fetch your videos.
+5. Download the FaveSave zip from the [releases](https://github.com/joeycato/tiktok-favesave/releases) page and extract it to a local folder ( or if you prefer you can build and run it locally with the _run_app.sh_ script ). After launching it, select the location of your JSON file ( e.g. _user_data_tiktok.json_ ) , choose your output folder and preferences, then click **Start Download** to fetch your videos.
 
 Note: Videos that have already been downloaded will be skipped ( in case you wish to re-run the app later and resume operation )
 
