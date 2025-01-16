@@ -9,11 +9,16 @@ FaveSave is a free-to-use desktop app that automatically downloads your favorite
 1. First you'll need to visit TikTok’s [data request page](https://support.tiktok.com/en/account-and-privacy/personalized-ads-and-data/requesting-your-data#1).
 
 2. Submit a data request, choosing JSON as your export format.
+
+![Screenshot of requesting data](./screenshots/request_data.png)
+
 3. Wait for TikTok to process your request (typically 1–3 days).
 
 ⚠️ **Important:** With the TikTok ban expected to take effect on January 19, 2025, request your data as soon as possible to ensure you have enough time to download and preserve your videos.
 
 4. Once your data is ready, download it from TikTok and extract the folder.
+
+![Screenshot of downloading data](./screenshots/download_data.png)
 
 5. Download the FaveSave zip from the [releases](https://github.com/joeycato/tiktok-favesave/releases) page and extract it to a local folder. After launching it, select the location of your JSON file ( e.g. _user_data_tiktok.json_ ) , choose your output folder and preferences, then click **Start Download** to fetch your videos.
 
