@@ -23,10 +23,16 @@ from PyQt6.QtWidgets import (
     QLabel,
 )
 
-# Function to load JSON file
+# Function to load JSON file with explicit UTF-8 encoding
 def load_json(json_file):
-    with open(json_file, 'r') as file:
-        return json_load(file)
+    try:
+        with open(json_file, 'r', encoding='utf-8') as file:  # Explicitly set UTF-8 encoding
+            return json_load(file)
+    except UnicodeDecodeError as e:
+        raise ValueError(f"Failed to decode JSON file. Ensure it's UTF-8 encoded. Error: {e}")
+    except Exception as e:
+        raise ValueError(f"Failed to load JSON file. Error: {e}")
+
 
 
 # Function to download video using yt-dlp
