@@ -12,9 +12,9 @@ FaveSave is a free-to-use desktop app that automatically downloads your favorite
 
 ![Screenshot of requesting data](./screenshots/request_data.png)
 
-3. Wait for TikTok to process your request (typically 1–3 days).
+3. Wait for TikTok to process your request.
 
-⚠️ **Important:** With the U.S. TikTok ban expected to take effect on January 19, 2025, request your data as soon as possible to ensure you have enough time to download and preserve your videos.
+⚠️ **Important:** With the U.S. TikTok ban expected to take effect on Sunday, January 19, 2025, request your data as soon as possible to ensure you have enough time to download and preserve your videos.
 
 4. Once your data is ready, download it from TikTok and extract the folder.
 
