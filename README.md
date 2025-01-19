@@ -2,7 +2,7 @@
 
 FaveSave is a free-to-use desktop app that automatically downloads your favorite and liked TikTok videos ( via [yt_dlp](https://github.com/yt-dlp/yt-dlp) ) using your exported profile data.
 
-![Screenshot of FaveSave app](./screenshots/favesave.png)
+<img src="./screenshots/favesave.png" alt="Screenshot of app" width="700" >
 
 ## How To Use
 

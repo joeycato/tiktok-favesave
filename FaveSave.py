@@ -1,10 +1,7 @@
-from json import load as json_load
-from os import makedirs, listdir
-from os import path
 import sys
-from pathlib import Path  # Added for improved path handling
-
 import yt_dlp
+from json import load as json_load
+from os import makedirs, listdir, path
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QCoreApplication
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
@@ -17,7 +14,7 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QSpacerItem,
     QSizePolicy,
-    QTextEdit,
+    QTextEdit,  
     QVBoxLayout,
     QWidget,
     QLabel,
@@ -64,27 +61,25 @@ def is_video_downloaded(log_callback, video_url, downloaded_videos, prefix):
 # Function to get a set of already downloaded video filenames; creates folder if needed
 def get_downloaded_videos(download_folder):
     downloaded_videos = set()
-    # Use pathlib for more robust path handling
-    folder = Path(download_folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    for file_path in folder.iterdir():
-        if file_path.is_file():
-            downloaded_videos.add(file_path.name)
+    makedirs(download_folder, exist_ok=True)
+    for file_name in listdir(download_folder):
+        downloaded_videos.add(file_name)
     return downloaded_videos
 
 
 # Main processing function (with progress callback added)
-def process_videos(json_file, download_folder, log_callback, progress_callback, download_faves, download_likes):
+def process_videos(json_file, download_folder, log_callback, progress_callback, download_faves, download_likes, download_shared):
     # Attempt to load the JSON file
     try:
         data = load_json(json_file)
     except Exception as e:
         log_callback(f"Error loading JSON file: {e}")
-        return 0, 0, 0, 0, 0, 0, []  # Return zero counts on error
+        return 0, 0, 0, 0, 0, 0, 0, 0, []  # Return zero counts on error
 
     video_links = []
     faves_count = 0
     likes_count = 0
+    shared_count = 0
 
     # Process favorite videos if selected
     if download_faves:
@@ -104,19 +99,30 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
             date = video.get('date', '').replace(':', '').replace(' ', '-').replace('/', '-')
             video_links.append((video['link'], f"liked_{date}_" if date else "liked_"))
 
+    # Process shared videos if selected
+    if download_shared:
+        shared_videos = data.get('Activity', {}).get('Share History', {}).get('ShareHistoryList', [])
+        shared_count = len(shared_videos)
+        for video in shared_videos:
+            # Format date for filename prefix
+            date = video.get('Date', '').replace(':', '').replace(' ', '-').replace('/', '-')
+            video_links.append((video['Link'], f"shared_{date}_" if date else "shared_"))
+
     downloaded_videos = get_downloaded_videos(download_folder)
 
     total_videos = len(video_links)
     if total_videos == 0:
         log_callback("No videos to download.")
-        return 0, 0, 0, 0, 0, 0, []
+        return 0, 0, 0, 0, 0, 0, 0, 0, []
 
     downloaded_count = 0
     skipped_count = 0
     downloaded_faves = 0
     downloaded_likes = 0
+    downloaded_shared = 0
     skipped_faves = 0
     skipped_likes = 0
+    skipped_shared = 0
 
     # Process each video in the list
     for index, (url, prefix) in enumerate(video_links, start=1):
@@ -127,8 +133,10 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
             skipped_count += 1
             if "faved_" in prefix:
                 skipped_faves += 1
-            else:
+            elif "liked_" in prefix:
                 skipped_likes += 1
+            elif "shared_" in prefix:
+                skipped_shared += 1
         else:
             log_callback(f"Downloading: {url}")
             try:
@@ -136,8 +144,10 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
                 downloaded_count += 1
                 if "faved_" in prefix:
                     downloaded_faves += 1
-                else:
+                elif "liked_" in prefix:
                     downloaded_likes += 1
+                elif "shared_" in prefix:
+                    downloaded_shared += 1
             except Exception as e:
                 log_callback(f"Failed to download {url}: {e}")
 
@@ -152,8 +162,10 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
         skipped_count,
         downloaded_faves,
         downloaded_likes,
+        downloaded_shared,
         skipped_faves,
         skipped_likes,
+        skipped_shared,
         video_links
     )
 
@@ -163,19 +175,23 @@ class VideoDownloadWorker(QThread):
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int)
 
-    def __init__(self, json_file, download_folder, download_faves, download_likes):
+    def __init__(self, json_file, download_folder, download_faves, download_likes, download_shared):
         super().__init__()
         self.json_file = json_file
         self.download_folder = download_folder
         self.download_faves = download_faves
         self.download_likes = download_likes
+        self.download_shared = download_shared
         self.total_videos = 0
         self.downloaded_videos = 0
         self.skipped_videos = 0
         self.downloaded_faves = 0
         self.downloaded_likes = 0
+        self.downloaded_shared = 0
         self.skipped_faves = 0
         self.skipped_likes = 0
+        self.skipped_shared = 0
+
 
     def run(self):
         results = process_videos(
@@ -184,7 +200,8 @@ class VideoDownloadWorker(QThread):
             self.log_signal.emit,
             self.progress_signal.emit,
             self.download_faves,
-            self.download_likes
+            self.download_likes,
+            self.download_shared
         )
         (
             self.total_videos,
@@ -192,8 +209,10 @@ class VideoDownloadWorker(QThread):
             self.skipped_videos,
             self.downloaded_faves,
             self.downloaded_likes,
+            self.downloaded_shared,
             self.skipped_faves,
             self.skipped_likes,
+            self.skipped_shared,
             _
         ) = results
 
@@ -202,7 +221,7 @@ class VideoDownloadWorker(QThread):
 class VideoDownloaderApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FaveSave - TikTok Video Downloader")
+        self.setWindowTitle("FaveSave - TikTok Video Downloader -v1.1.0")
         self.setGeometry(100, 100, 600, 500)
 
         self.json_file = None
@@ -217,6 +236,7 @@ class VideoDownloaderApp(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+
 
         # Title label
         title_label = QLabel("Download Your Favorite TikTok Videos")
@@ -250,7 +270,7 @@ class VideoDownloaderApp(QMainWindow):
         layout.addWidget(download_options_label)
 
         # Checkbox for favorite videos
-        self.faves_checkbox = QCheckBox("🔖 Favorites")
+        self.faves_checkbox = QCheckBox("🔖 Favorited")
         self.faves_checkbox.setChecked(True)
         layout.addWidget(self.faves_checkbox)
 
@@ -258,6 +278,11 @@ class VideoDownloaderApp(QMainWindow):
         self.likes_checkbox = QCheckBox("❤️ Liked")
         self.likes_checkbox.setChecked(True)
         layout.addWidget(self.likes_checkbox)
+
+        # Checkbox for shared videos
+        self.shared_checkbox = QCheckBox("🔗 Shared")
+        self.shared_checkbox.setChecked(True)
+        layout.addWidget(self.shared_checkbox)
 
         # Text area for logging messages
         self.description = QTextEdit()
@@ -284,6 +309,7 @@ class VideoDownloaderApp(QMainWindow):
         donation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(donation_label)
 
+
     # Append message to the log area
     def log_message(self, message):
         self.description.append(message)
@@ -296,8 +322,11 @@ class VideoDownloaderApp(QMainWindow):
                 data = load_json(self.json_file)
                 favorite_videos = data.get('Activity', {}).get('Favorite Videos', {}).get('FavoriteVideoList', [])
                 liked_videos = data.get('Activity', {}).get('Like List', {}).get('ItemFavoriteList', [])
-                self.faves_checkbox.setText(f"🔖 Favorites ({len(favorite_videos)} available)")
+                shared_videos = data.get('Activity', {}).get('Share History', {}).get('ShareHistoryList', [])
+
+                self.faves_checkbox.setText(f"🔖 Favorited ({len(favorite_videos)} available)")
                 self.likes_checkbox.setText(f"❤️ Liked ({len(liked_videos)} available)")
+                self.shared_checkbox.setText(f"🔗 Shared ({len(shared_videos)} available)")
             except Exception as e:
                 self.log_message(f"Error loading JSON file for video count: {e}")
 
@@ -314,7 +343,7 @@ class VideoDownloaderApp(QMainWindow):
 
             # Update download_folder to the parent directory of the JSON file
             if not self.download_folder:
-                self.download_folder = str(Path(json_file).parent / "downloaded_videos")
+                self.download_folder = path.join(path.dirname(json_file), "downloaded_videos")
             self.output_folder_label.setText("Set Output Folder:")
             self.output_folder_button.setText(self.download_folder)
             self.log_message(f"Output folder set to: {self.download_folder}")
@@ -336,6 +365,7 @@ class VideoDownloaderApp(QMainWindow):
 
         download_faves = self.faves_checkbox.isChecked()
         download_likes = self.likes_checkbox.isChecked()
+        download_shared = self.shared_checkbox.isChecked()
 
         self.log_message(f"Selected JSON File: {self.json_file}")
         self.log_message(f"Selected Output Folder: {self.download_folder}")
@@ -344,7 +374,7 @@ class VideoDownloaderApp(QMainWindow):
         self.progress_bar.setValue(0)
 
         # Create a worker thread to process downloads without freezing the UI
-        self.worker = VideoDownloadWorker(self.json_file, self.download_folder, download_faves, download_likes)
+        self.worker = VideoDownloadWorker(self.json_file, self.download_folder, download_faves, download_likes, download_shared)
         self.worker.log_signal.connect(self.log_message)
         self.worker.progress_signal.connect(self.update_progress_bar)
         self.worker.finished.connect(self.on_worker_finished)
@@ -355,6 +385,7 @@ class VideoDownloaderApp(QMainWindow):
         self.log_message(f"🍿 {self.worker.total_videos} total videos processed!")
         self.log_message(f"🔖 Favorite Videos: Downloaded: {self.worker.downloaded_faves}, Skipped: {self.worker.skipped_faves}")
         self.log_message(f"❤️ Liked Videos: Downloaded: {self.worker.downloaded_likes}, Skipped: {self.worker.skipped_likes}")
+        self.log_message(f"🔗 Shared Videos: Downloaded: {self.worker.downloaded_shared}, Skipped: {self.worker.skipped_shared}")
         self.start_button.setText("Done! (Click again to restart)")
         self.worker = None
 
