@@ -14,8 +14,6 @@ FaveSave is a free-to-use desktop app that automatically downloads your favorite
 
 3. Wait for TikTok to process your request.
 
-⚠️ **Update:** While the TikTok ban is now in effect, it looks like you're still able to download your data ( at least if you access their site from your web browser )
-
 4. Once your data is ready, download it from TikTok and extract the folder.
 
 ![Screenshot of downloading data](./screenshots/download_data.png)
