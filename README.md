@@ -2,13 +2,31 @@
 
 FaveSave is a free-to-use desktop app that automatically downloads your favorite and liked TikTok videos ( via [yt_dlp](https://github.com/yt-dlp/yt-dlp) ) using your exported profile data.
 
-<img src="./screenshots/favesave.v1.1.0.png" alt="Screenshot of app" width="700" >
+<img src="./screenshots/favesave.v1.2.0.png" alt="Screenshot of app" width="700" >
+
+## Features
+
+- **Selective Downloads**: Choose between favorites and/or liked videos
+- **Preview Counts**: Time filter shows preview count before applying
+- **High-Quality Downloads**: Downloads best available video and audio quality (MP4/M4A)
+- **Duplicate Detection**: Automatically skips already downloaded videos
+- **Time Filter**: Download videos from specific time periods
+- **Progress Tracking**: Real-time progress indication
+- **Resume/Cancel**: Pause and resume download operations
+- **Concurrent Downloads**: Multiple simultaneous video downloads
+- **Interactive Logs**: Clickable links in download logs
+- **Settings Persistence**: Remembers user preferences between sessions
+- **Blocked Video Tracking**: Automatic detection and tracking of unavailable videos
+- **Retry Logic**: Automatic retry mechanism for failed downloads
+- **Session Management**: Persistent session data with user overrides
+- **Smart Parsing**: Fallback logic for different JSON structures
+- **Memory Optimization**: JSON file caching for improved performance
 
 ## How To Use
 
 1. First you'll need to visit TikTok’s [data request page](https://support.tiktok.com/en/account-and-privacy/personalized-ads-and-data/requesting-your-data#1).
 
-2. Submit a data request, choosing JSON as your export format.
+2. Submit a data request, choosing Custom data, "Likes and Favorites" and JSON as your export format.
 
 ![Screenshot of requesting data](./screenshots/request_data.png)
 
