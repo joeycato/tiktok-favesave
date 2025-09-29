@@ -205,13 +205,13 @@ def get_downloaded_videos(download_folder):
 
 
 # Main processing function (with progress callback added)
-def process_videos(json_file, download_folder, log_callback, progress_callback, detailed_progress_callback, download_faves, download_likes, earliest_date=None, stop_event=None, max_concurrent_downloads=3, blocked_videos=None, failed_videos=None):
+def process_videos(json_file, download_folder, log_callback, progress_callback, detailed_progress_callback, download_faves, download_likes, download_shares, earliest_date=None, stop_event=None, max_concurrent_downloads=3, blocked_videos=None, failed_videos=None):
     # Attempt to load the JSON file
     try:
         data = load_json(json_file)
     except Exception as e:
         log_callback(f"Error loading JSON file: {e}")
-        return 0, 0, 0, 0, 0, 0, 0, []  # Return zero counts on error
+        return 0, 0, 0, 0, 0, 0, 0, 0, []  # Return zero counts on error
 
     video_links = []
 
@@ -240,6 +240,17 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
                 date = video_date.replace(':', '').replace(' ', '-').replace('/', '-')
                 video_links.append((video['link'], f"liked_{date}_" if date else "liked_"))
 
+    # Process shared videos if selected
+    if download_shares:
+        shared_videos = activity_data.get('Share History', {}).get('ShareHistoryList', [])
+        for video in shared_videos:
+            # Check if video date is after earliest date filter
+            video_date = video.get('Date', '')
+            if is_date_after_earliest(video_date, earliest_date):
+                # Format date for filename prefix
+                date = video_date.replace(':', '').replace(' ', '-').replace('/', '-')
+                video_links.append((video['Link'], f"shared_{date}_" if date else "shared_"))
+
     # Validate download folder and get existing videos
     try:
         downloaded_videos = get_downloaded_videos(download_folder)
@@ -253,13 +264,14 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
     total_videos = len(video_links)
     if total_videos == 0:
         log_callback("No videos to download.")
-        return 0, 0, 0, 0, 0, 0, 0, []
+        return 0, 0, 0, 0, 0, 0, 0, 0, []
 
     downloaded_count = 0
     blocked_count = 0
     failed_count = 0
     downloaded_faves = 0
     downloaded_likes = 0
+    downloaded_shares = 0
 
     start_time = time.time()
     download_times = []
@@ -321,7 +333,7 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
             return {'status': 'error', 'error': str(exc)}
 
     def harvest_futures(block):
-        nonlocal downloaded_count, processed_count, downloaded_faves, downloaded_likes, failed_count
+        nonlocal downloaded_count, processed_count, downloaded_faves, downloaded_likes, downloaded_shares, failed_count
         if not active_futures:
             return False
         timeout = None if block else 0
@@ -348,6 +360,8 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
                     downloaded_faves += 1
                 elif "liked_" in context['prefix']:
                     downloaded_likes += 1
+                elif "shared_" in context['prefix']:
+                    downloaded_shares += 1
                 log_callback(f"✅ Downloaded: {context['url']}")
             elif status == 'cancelled':
                 log_callback(f"🛑 Cancelled: {context['url']}")
@@ -413,6 +427,8 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
                 downloaded_faves += 1
             elif "liked_" in prefix:
                 downloaded_likes += 1
+            elif "shared_" in prefix:
+                downloaded_shares += 1
             processed_count += 1
             emit_progress(context)
             update_progress_bar()
@@ -428,6 +444,7 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
             failed_count,
             downloaded_faves,
             downloaded_likes,
+            downloaded_shares,
             video_links
         )
 
@@ -477,6 +494,7 @@ def process_videos(json_file, download_folder, log_callback, progress_callback, 
         failed_count,
         downloaded_faves,
         downloaded_likes,
+        downloaded_shares,
         video_links
     )
 
@@ -487,12 +505,13 @@ class VideoDownloadWorker(QThread):
     progress_signal = pyqtSignal(int)
     detailed_progress_signal = pyqtSignal(dict)  # New signal for detailed progress info
 
-    def __init__(self, json_file, download_folder, download_faves, download_likes, earliest_date=None, blocked_videos=None, failed_videos=None):
+    def __init__(self, json_file, download_folder, download_faves, download_likes, download_shares, earliest_date=None, blocked_videos=None, failed_videos=None):
         super().__init__()
         self.json_file = json_file
         self.download_folder = download_folder
         self.download_faves = download_faves
         self.download_likes = download_likes
+        self.download_shares = download_shares
         self.earliest_date = earliest_date
         self.blocked_videos = blocked_videos
         self.failed_videos = failed_videos
@@ -502,6 +521,7 @@ class VideoDownloadWorker(QThread):
         self.failed_videos_count = 0
         self.downloaded_faves = 0
         self.downloaded_likes = 0
+        self.downloaded_shares = 0
         self.start_time = None
         self.current_video_url = ""
         self.current_video_index = 0
@@ -519,6 +539,7 @@ class VideoDownloadWorker(QThread):
             self.detailed_progress_signal.emit,
             self.download_faves,
             self.download_likes,
+            self.download_shares,
             self.earliest_date,
             stop_event=self.stop_event,
             max_concurrent_downloads=self.max_concurrent_downloads,
@@ -532,6 +553,7 @@ class VideoDownloadWorker(QThread):
             self.failed_videos_count,
             self.downloaded_faves,
             self.downloaded_likes,
+            self.downloaded_shares,
             _
         ) = results
 
@@ -638,6 +660,12 @@ class VideoDownloaderApp(QMainWindow):
         self.likes_checkbox.setChecked(True)
         self.likes_checkbox.toggled.connect(self.update_filter_counts)  # Update counts when toggled
         layout.addWidget(self.likes_checkbox)
+
+        # Checkbox for shared videos
+        self.shares_checkbox = QCheckBox("⬆️ Shared")
+        self.shares_checkbox.setChecked(True)
+        self.shares_checkbox.toggled.connect(self.update_filter_counts)  # Update counts when toggled
+        layout.addWidget(self.shares_checkbox)
 
 
         # Advanced settings section
@@ -823,7 +851,7 @@ class VideoDownloaderApp(QMainWindow):
     # Calculate how many videos match current filter settings
     def calculate_filtered_counts(self):
         if not self.json_file:
-            return 0, 0, 0  # faves, likes, total
+            return 0, 0, 0, 0  # faves, likes, shares, total
         
         try:
             data = self.get_cached_json_data()
@@ -858,15 +886,24 @@ class VideoDownloaderApp(QMainWindow):
                     if is_date_after_earliest(video_date, earliest_date):  # No logging for count calculation
                         likes_count += 1
             
-            total_count = faves_count + likes_count
-            return faves_count, likes_count, total_count
+            # Count shared videos
+            shared_videos = activity_data.get('Share History', {}).get('ShareHistoryList', [])
+            shares_count = 0
+            if self.shares_checkbox.isChecked():
+                for video in shared_videos:
+                    video_date = video.get('date', '')
+                    if is_date_after_earliest(video_date, earliest_date):  # No logging for count calculation
+                        shares_count += 1
+            
+            total_count = faves_count + likes_count + shares_count
+            return faves_count, likes_count, shares_count, total_count
             
         except Exception:
-            return 0, 0, 0
+            return 0, 0, 0, 0
 
     # Update filter counts and checkbox labels
     def update_filter_counts(self):
-        faves_count, likes_count, total_count = self.calculate_filtered_counts()
+        faves_count, likes_count, shares_count, total_count = self.calculate_filtered_counts()
         
         # Update the date filter checkbox label with total count
         if self.enable_date_filter.isChecked():
@@ -877,6 +914,7 @@ class VideoDownloaderApp(QMainWindow):
         # Update individual checkbox labels
         self.faves_checkbox.setText(f"🔖 Favorited ({faves_count} candidates)")
         self.likes_checkbox.setText(f"❤️ Liked ({likes_count} candidates)")
+        self.shares_checkbox.setText(f"⬆️ Shared ({shares_count} candidates)")
 
     # Toggle date filter visibility
     def toggle_date_filter(self, checked, log_message=True):
@@ -1017,9 +1055,10 @@ class VideoDownloaderApp(QMainWindow):
 
         download_faves = self.faves_checkbox.isChecked()
         download_likes = self.likes_checkbox.isChecked()
+        download_shares = self.shares_checkbox.isChecked()
 
-        if not (download_faves or download_likes):
-            QMessageBox.warning(self, "Warning", "Select at least one category (Favorited or Liked) to download.")
+        if not (download_faves or download_likes or download_shares):
+            QMessageBox.warning(self, "Warning", "Select at least one category (Favorited, Liked, or Shared) to download.")
             return
         
         # Get date filter if enabled
@@ -1062,7 +1101,7 @@ class VideoDownloaderApp(QMainWindow):
         self.progress_bar.setValue(0)
         
         # Calculate total videos for better status message
-        faves_count, likes_count, total_count = self.calculate_filtered_counts()
+        faves_count, likes_count, shares_count, total_count = self.calculate_filtered_counts()
         if total_count > 0:
             self.progress_info_label.setText(f"🚀 Starting download of {total_count:,} videos...")
         else:
@@ -1076,7 +1115,7 @@ class VideoDownloaderApp(QMainWindow):
 
         # Create a worker thread to process downloads without freezing the UI
         max_concurrent = self.concurrent_downloads_spinner.value()
-        self.worker = VideoDownloadWorker(self.json_file, self.download_folder, download_faves, download_likes, earliest_date, self.blocked_videos, self.failed_videos)
+        self.worker = VideoDownloadWorker(self.json_file, self.download_folder, download_faves, download_likes, download_shares, earliest_date, self.blocked_videos, self.failed_videos)
         self.worker.max_concurrent_downloads = max_concurrent
         self.worker.log_signal.connect(self.log_message)
         self.worker.progress_signal.connect(self.update_progress_bar)
@@ -1155,6 +1194,7 @@ class VideoDownloaderApp(QMainWindow):
             self.output_folder_button.setEnabled(False)
             self.faves_checkbox.setEnabled(False)
             self.likes_checkbox.setEnabled(False)
+            self.shares_checkbox.setEnabled(False)
             self.enable_date_filter.setEnabled(False)
             self.date_filter.setEnabled(False)
             self.concurrent_downloads_spinner.setEnabled(False)
@@ -1173,6 +1213,7 @@ class VideoDownloaderApp(QMainWindow):
             self.output_folder_button.setEnabled(True)
             self.faves_checkbox.setEnabled(True)
             self.likes_checkbox.setEnabled(True)
+            self.shares_checkbox.setEnabled(True)
             self.enable_date_filter.setEnabled(True)
             self.date_filter.setEnabled(True)
             self.concurrent_downloads_spinner.setEnabled(True)
